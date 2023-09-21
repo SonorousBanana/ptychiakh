@@ -1,0 +1,35 @@
+[debug] [2023-09-06T12:40:27.143Z] ----------------------------------------------------------------------
+[debug] [2023-09-06T12:40:27.149Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\giorg\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy --only functions
+[debug] [2023-09-06T12:40:27.150Z] CLI Version:   12.5.2
+[debug] [2023-09-06T12:40:27.150Z] Platform:      win32
+[debug] [2023-09-06T12:40:27.150Z] Node Version:  v20.0.0
+[debug] [2023-09-06T12:40:27.151Z] Time:          Wed Sep 06 2023 15:40:27 GMT+0300 (Eastern European Summer Time)
+[debug] [2023-09-06T12:40:27.151Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2023-09-06T12:40:27.241Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2023-09-06T12:40:27.242Z] > authorizing via signed-in user (giorgoschatzakis.gc@gmail.com)
+[debug] [2023-09-06T12:40:27.242Z] [iam] checking project fir-ath-60feb for permissions ["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]
+[debug] [2023-09-06T12:40:27.244Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions [none]
+[debug] [2023-09-06T12:40:27.244Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions x-goog-quota-user=projects/fir-ath-60feb
+[debug] [2023-09-06T12:40:27.244Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions {"permissions":["cloudfunctions.functions.create","cloudfunctions.functions.delete","cloudfunctions.functions.get","cloudfunctions.functions.list","cloudfunctions.functions.update","cloudfunctions.operations.get","firebase.projects.get"]}
+[debug] [2023-09-06T12:40:32.357Z] *** [apiv2] error from fetch(https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions, {"headers":{},"method":"POST","body":"{\"permissions\":[\"cloudfunctions.functions.create\",\"cloudfunctions.functions.delete\",\"cloudfunctions.functions.get\",\"cloudfunctions.functions.list\",\"cloudfunctions.functions.update\",\"cloudfunctions.operations.get\",\"firebase.projects.get\"]}"}): FetchError: request to https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions failed, reason: Socket connection timeout
+[debug] [2023-09-06T12:40:32.357Z] [iam] error while checking permissions, command may fail: FirebaseError: Failed to make request to https://cloudresourcemanager.googleapis.com/v1/projects/fir-ath-60feb:testIamPermissions
+[debug] [2023-09-06T12:40:32.358Z] >>> [apiv2][query] POST https://iam.googleapis.com/v1/projects/fir-ath-60feb/serviceAccounts/fir-ath-60feb@appspot.gserviceaccount.com:testIamPermissions [none]
+[debug] [2023-09-06T12:40:32.358Z] >>> [apiv2][body] POST https://iam.googleapis.com/v1/projects/fir-ath-60feb/serviceAccounts/fir-ath-60feb@appspot.gserviceaccount.com:testIamPermissions {"permissions":["iam.serviceAccounts.actAs"]}
+[debug] [2023-09-06T12:40:33.198Z] <<< [apiv2][status] POST https://iam.googleapis.com/v1/projects/fir-ath-60feb/serviceAccounts/fir-ath-60feb@appspot.gserviceaccount.com:testIamPermissions 404
+[debug] [2023-09-06T12:40:33.198Z] <<< [apiv2][body] POST https://iam.googleapis.com/v1/projects/fir-ath-60feb/serviceAccounts/fir-ath-60feb@appspot.gserviceaccount.com:testIamPermissions {"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}}
+[debug] [2023-09-06T12:40:33.199Z] [functions] service account IAM check errored, deploy may fail: HTTP Error: 404, Unknown service account {"name":"FirebaseError","children":[],"context":{"body":{"error":{"code":404,"message":"Unknown service account","status":"NOT_FOUND"}},"response":{"statusCode":404}},"exit":1,"message":"HTTP Error: 404, Unknown service account","status":404}
+[info] 
+[info] === Deploying to 'fir-ath-60feb'...
+[info] 
+[info] i  deploying functions 
+[info] Running command: npm --prefix "$RESOURCE_DIR" run lint
+[info] +  functions: Finished running predeploy script. 
+[debug] [2023-09-06T12:40:38.788Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb [none]
+[debug] [2023-09-06T12:40:43.834Z] *** [apiv2] error from fetch(https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb, {"headers":{},"method":"GET","signal":{}}): FetchError: request to https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb failed, reason: Socket connection timeout
+[debug] [2023-09-06T12:40:43.836Z] Failed to make request to https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb (original: request to https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb failed, reason: Socket connection timeout)
+[debug] [2023-09-06T12:40:44.041Z] FirebaseError: Failed to make request to https://firebase.googleapis.com/v1beta1/projects/fir-ath-60feb
+    at RetryOperation._fn (C:\Users\giorg\AppData\Roaming\npm\node_modules\firebase-tools\lib\apiv2.js:239:31)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+[error] 
+[error] Error: Failed to get Firebase project fir-ath-60feb. Please make sure the project exists and your account has permission to access it.
