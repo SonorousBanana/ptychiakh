@@ -1,31 +1,27 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { Alert, View, TouchableOpacity, Text, Image, StyleSheet, FlatList, TextInput, Button, SafeAreaView, TouchableWithoutFeedback, Keyboard, Pressable, ScrollView, VirtualizedList } from "react-native";
+import { RefreshControl, Alert, View, TouchableOpacity, Text, StyleSheet, Button, SafeAreaView, TouchableWithoutFeedback, Keyboard, Pressable, ScrollView, } from "react-native";
 import { useNavigation } from "@react-navigation/native";
-import { createStackNavigator } from '@react-navigation/stack';
 import { NotificationsProvider, useNotifications } from './NotificationsContext';
 import { useRefreshContext } from './RefreshContext';
-import { FontAwesome } from '@expo/vector-icons';
 import colors from '../colors';
 import {
   doc,
+  onSnapshot,
   collection,
   deleteDoc,
   getDocs,
+  getDoc,
   query,
   where,
-  getCountFromServer,
+  orderBy,
+  limit,
 } from 'firebase/firestore';
 import { auth, database } from '../firebase';
-import { AntDesign } from '@expo/vector-icons';
-import { Entypo } from '@expo/vector-icons';
 import Ionic from 'react-native-vector-icons/Ionicons';
-import LocationComponent from "../location";
-import { Card } from 'react-native-paper';
+import { Card, Paragraph } from 'react-native-paper';
 import MapView, { Marker } from 'react-native-maps';
 
 const catImageUrl = "https://i.guim.co.uk/img/media/26392d05302e02f7bf4eb143bb84c8097d09144b/446_167_3683_2210/master/3683.jpg?width=1200&height=1200&quality=85&auto=format&fit=crop&s=49ed3252c0b2ffb49cf8b508892e452d";
-
-
 
 
 const Home = ({ route }) => {
@@ -36,98 +32,179 @@ const Home = ({ route }) => {
   const [currentAdmin, setCurrentAdmin] = useState(false);
   const [existAdmin, setExistAdmin] = useState (false);
   const [events, setEvents] = useState([]);
-  const [sortedEvent, setSortedEvent] = useState([]);
   const [eventLocations, setEventLocations] = useState([]);
   const { newNotificationsCount } = useNotifications();
   const { refreshFlag } = useRefreshContext();
   const [votingData, setVotingData] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [resultsForVoting, setResultsForVoting] = useState({});
 
-
-  const fetchEvents = async () => {
+  useEffect(() => {
     const eventsRef = collection(database, 'Community', location, 'event');
-    const querySnapshot = await getDocs(eventsRef);
+    const subscribe = onSnapshot(eventsRef, (querySnapshot) => {
+      setEvents(querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+        
+      }))
+      );
+      
+    });
+    // Stop listening for updates when no longer required
+    return () => subscribe();
+  }, [location]);
 
-    const eventData = querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    }));
 
-    setEvents(eventData);
-  };
-
-
-  const viewAdmin = async () => {
-    let mada;
-    const Admin = query(collection(database, 'Community', location, 'users'), where('isAdmin', '==', true));
-    const querySnapshot1 = await getDocs(Admin);
-            querySnapshot1.forEach((doc) => {
-              
-              mada = doc.data().user;
-              
-          });
-          setUserAdmin(mada);
-          if(  auth.currentUser?.email == mada){
-            setCurrentAdmin(true);
-          }
-          if (userAdmin !== ''){
-            setExistAdmin(true);
-          }
-  };
-  viewAdmin();
-
-  const fetchVotingData = async () => {
-    try {
-      const votingRef = collection(database, 'Community', location, 'voting');
-      const votingSnapshot = await getDocs(votingRef);
+  useEffect(() => {
+    // Define a Firestore query for 'users' where 'isAdmin' is true
+    const adminQuery = query(collection(database, 'Community', location, 'users'), where('isAdmin', '==', true));
   
-      if (!votingSnapshot.empty) {
-        const votingData = votingSnapshot.docs.map(doc => ({
-          key: doc.id,
-          ...doc.data(),
-        }));
-        setVotingData(votingData);
+    // Subscribe to real-time updates using onSnapshot
+    const unsubscribe = onSnapshot(adminQuery, (querySnapshot) => {
+      let mada = null;
+      querySnapshot.forEach((doc) => {
+        mada = doc.data().user;
+      });
+  
+      setUserAdmin(mada);
+  
+      if (auth.currentUser?.email === mada) {
+        setCurrentAdmin(true);
+      } else {
+        setCurrentAdmin(false);
       }
-    } catch (error) {
-      console.error('Error fetching voting data:', error);
-    }
-  };
+  
+      if (mada !== null) {
+        setExistAdmin(true);
+      } else {
+        setExistAdmin(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [userAdmin]);
 
-  const fetchResultData = async votingKey => {
+  
+  const fetchResultsForVoting = async (votingId) => {
     try {
-      const resultRef = doc(database, 'Community', location, 'voting', votingKey, 'result');
+      const resultRef = collection(
+        database,
+        'Community',
+        location,
+        'voting',
+        votingId,
+        'results'
+      );
       const resultSnapshot = await getDocs(resultRef);
 
-      if (!resultSnapshot.empty) {
-      const resultData = resultSnapshot.docs.map(doc => ({
-        key: doc.id,
-        ...doc.data(),
+      const resultData = resultSnapshot.docs.map((doc) => {
+        const data = doc.data();
+        const voteIds = data.votesIds || {};
+        const voteCount = Object.keys(voteIds).length;
+        return {
+          key: doc.id,
+          count: voteCount,
+        };
+      });
+
+      // Store the results in a state variable specific to this voting
+      setResultsForVoting((prevResults) => ({
+        ...prevResults,
+        [votingId]: resultData,
       }));
-    }
-      // You can do something with the resultData if needed
     } catch (error) {
-      console.error('Error fetching result data:', error);
+      console.error(`Error fetching results for voting ${votingId}:`, error);
     }
   };
   
+
+  const findHighestVoteCount = (votingId) => {
+    const results = resultsForVoting[votingId];
+  
+    if (!results || results.length === 0) {
+      return null; // No results available for this voting
+    }
+  
+    let highestCount = 0;
+    let highestResult = null;
+  
+    results.forEach((result) => {
+      if (result.count > highestCount) {
+        highestCount = result.count;
+        highestResult = result;
+      }
+    });
+  
+    return highestResult;
+  };
+  
+
+  const fetchAllVotingsAndResults = async () => {
+    try {
+      const votingsRef = collection(database, 'Community', location, 'voting');
+      const votingsQuery = query(votingsRef, orderBy('deadlineDate', 'desc'), limit(5));
+      const votingsSnapshot = await getDocs(votingsQuery);
+      
+      const votingData = [];
+
+      if (!votingsSnapshot.empty) {
+        await Promise.all(
+          votingsSnapshot.docs.map(async (votingDoc) => {
+            const votingDocData = {
+              key: votingDoc.id,
+              ...votingDoc.data(),
+            };
+
+            // Fetch and set results for this voting
+            await fetchResultsForVoting(votingDoc.id);
+            findHighestVoteCount(votingDoc.id);
+            // Add voting data to the array
+
+
+            const deadlineTimestamp = votingDocData.deadlineDate.split('T')[0];
+            const currentDate = new Date().toISOString().split('T')[0];
+
+          if (currentDate > deadlineTimestamp) {
+            // Add voting data to the array only if the deadline has passed
+            votingData.push(votingDocData);
+          }
+
+          })
+        );
+       
+        setVotingData(votingData);
+      } else {
+        setVotingData([]);
+      }
+    } catch (error) {
+      console.error('Error fetching all votings and results:', error);
+    }
+  };
+  
+
 useLayoutEffect(() => {
 
-  viewAdmin();
-  fetchEvents();
-  fetchVotingData();
-
+  fetchAllVotingsAndResults();
+ 
 }, [userAdmin]);
 
-
-  const fetchNumOfUsers = async () =>{
-  const countUsers = collection(database, 'Community', location, 'users');
-  const snapshot =await getCountFromServer(countUsers);
-  setNumOfUsers(snapshot.data().count);
-
-  console.log('count: ', snapshot.data().count);
-  }
-  fetchNumOfUsers();
-
-
+    
+    useEffect(() => {
+      const countUsers = collection(database, 'Community', location, 'users');
+      
+      const unsubscribe = onSnapshot(countUsers, (querySnapshot) => {
+        let count1 = 0;
+        querySnapshot.forEach((doc) => {
+          count1 = count1 + 1
+          
+        });
+        console.log('Number of current users: ', count1);
+        setNumOfUsers(count1);
+      });
+      
+      // Stop listening for updates when no longer required
+      return () => unsubscribe();
+    }, [location]);
+  
     useLayoutEffect(() => {
       navigation.setOptions({
         headerRight: () => (
@@ -155,10 +232,10 @@ useLayoutEffect(() => {
           </TouchableOpacity>
         )
       });
-    }, [navigation]);
+    }, [navigation, newNotificationsCount]);
 
 
-    const fetchEventLocations = async () => {
+   const fetchEventLocations = async () => {
       try {
         const eventRef = collection(database, 'Community', location, 'event');
         const eventSnapshot = await getDocs(eventRef);
@@ -167,7 +244,6 @@ useLayoutEffect(() => {
           ...doc.data()
         }));
 
-         // Geocode addresses to obtain latitude and longitude
       const geocodedEventData = await Promise.all(eventData.map(async event => {
         const address = event.location;
         const response = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=AIzaSyD-jrw1E9HJ3RFQKEwHhw04qLvaI-cafOM`);
@@ -184,16 +260,29 @@ useLayoutEffect(() => {
       }));
         
         setEventLocations(geocodedEventData);
+      //});
       } catch (error) {
         console.error('Error fetching event data:', error);
       }
     };
-    
-   
+
+    const onRefresh = useCallback(() => {
+
+      setRefreshing(true);
+
+      fetchEventLocations();
+      fetchAllVotingsAndResults();
+
+      setTimeout(() => {
+        setRefreshing(false);
+      }, 1500);
+    }, []);
+
+
 
   useLayoutEffect(() => {
 
-    async function deleteInactiveEvents() {
+    /*async function deleteInactiveEvents() {
       const date = new Date(); // Replace this with your actual date
 
 
@@ -212,11 +301,12 @@ useLayoutEffect(() => {
       
     }
   
-    deleteInactiveEvents();
+    deleteInactiveEvents();*/
 
     fetchEventLocations();
   },[]);
 
+  
   const deleteEvent = async (eventId, eventTitle) => {
     try{
       console.log(eventTitle);
@@ -246,7 +336,25 @@ useLayoutEffect(() => {
       console.error('Error Delete Event', error);
     }
   };
-    
+  
+  const renderResultsForVoting = (votingId) => {
+    const highestResult = findHighestVoteCount(votingId);
+  
+    if (!highestResult) {
+      return <Text>No results available for this voting.</Text>;
+    }
+  
+    return (
+      <View>
+        <Paragraph style={{ marginTop:10 }}>
+        <Text>Community decided :  </Text>
+        <Text style={styles.decision}>{`${highestResult.key}: ${highestResult.count} votes`}</Text>
+        </Paragraph>
+      </View>
+    );
+  };
+  
+
     const renderItem = ({ item }) => (
       item.type === 'header' ? (
         <View style={{ marginTop: 5 }}>
@@ -308,13 +416,14 @@ useLayoutEffect(() => {
 
     return (
       
-      <ScrollView style={styles.container1}>
+      <ScrollView style={styles.container1}refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         
-        <View style={styles.container}>
-        
-          <View style={{ marginTop:5, justifyContent: 'center',}}>
-            <Text style={styles.title} color="red">Welcome to {name? name : city}</Text>
-          </View>
+          <View style={styles.container}>
+          <Text style={styles.title} color="red">
+            Welcome to {name === 'null' ? `${location} of ${city}` : name}
+          </Text>
+
           {existAdmin && (
             <Text style={styles.txtb}>
               Admin of {name} is {userAdmin}
@@ -322,7 +431,7 @@ useLayoutEffect(() => {
           )}
           {!existAdmin && (
             <Text style={styles.txtb}>
-              There is no admin in this area. Please candidate or vote someone to be the Admin.
+              There is no admin in this area. Please candidate or vote someone to become Admin.
             </Text>
           )}
           {currentAdmin && (
@@ -334,31 +443,35 @@ useLayoutEffect(() => {
           <Pressable style={styles.numOfUsers}>
           <Text style={styles.txtw}>Current Users in this area Connected: {numOfUsers}</Text>
           </Pressable>
-       
+
           <Text>Email: {auth.currentUser?.email}</Text>
             <Text>Your postal code is: {location}</Text>
-            <TouchableOpacity>
 
-            </TouchableOpacity>
             {currentAdmin && (
-            <View style={styles.btnCrEvent}>
-              <Button
-              style={styles.createEventButtonText}
-                title="Create something for your citizen"
-                onPress={() => navigation.navigate('CreateVoting')}
-                color="white"
-              />
-              </View>
-            )}
+                    <TouchableOpacity
+                      style={styles.createButton}
+                      onPress={() => navigation.navigate('CreateVoting')}
+                    >
+                      <Ionic name="add-circle" size={24} color="white" style={styles.createIcon} />
+                      <Text style={styles.createButtonText}>Create something for your citizens</Text>
+                    </TouchableOpacity>
+                  )}
 
-            <View>
-                  <Text>Votings:</Text>
-                  {votingData.map(item => (
-                    <View key={item.key}>
-                      <Text>{item.title}</Text>
-                      
+            <View style={styles.votingsContainer}>
+                  <Text style={styles.votingsTitle}>The latest Community decisions :</Text>
+               
+                    
+                  {votingData.map((voting) => (
+                    <View key={voting.key}>
+                      <Card style={styles.votingCard}>
+                      {/* Render voting information here */}
+                      <Text style={styles.votingTitle}>Voting Title: {voting.title}</Text>
+                      {/* Render the results */}
+                      {renderResultsForVoting(voting.key)}
+                      </Card>
                     </View>
                   ))}
+
                 </View>
 
           <Text style={styles.subtitle}>Below you can find the scheduled events</Text>
@@ -388,47 +501,14 @@ useLayoutEffect(() => {
             marginTop: 10,
             justifyContent: 'center',
             alignItems: 'center',
-            //backgroundColor: "#fff",
         },
-        input: {
-          width: '80%',
-          borderWidth: 1,
-          borderColor: '#ccc',
-          borderRadius: 5,
-          padding: 10,
-          marginBottom: 20,
+        
+        header: {
+          backgroundColor: colors.primary,
+          paddingVertical: 20,
+          paddingHorizontal: 16,
         },
-        chatButton: {
-            backgroundColor: colors.primary,
-            height: 50,
-            width: 50,
-            borderRadius: 25,
-            alignItems: 'center',
-            justifyContent: 'center',
-            shadowColor: colors.primary,
-            shadowOffset: {
-                width: 0,
-                height: 2,
-            },
-            shadowOpacity: .9,
-            shadowRadius: 8,
-            marginRight: 20,
-            marginBottom: 50,
-        },
-        button: {
-
-          backgroundColor: 'black',
-          width: '160%',
-          padding: 15,
-          borderRadius: 10,
-          alignItems: 'center',
-          marginTop: 40,
-      },
-      buttonText: {
-          color: 'white',
-          fontWeight: '700',
-          fontSize: 16,
-      },
+      
       numOfUsers: {
         backgroundColor: '#3e3e3e', // Dark gray background color
         paddingVertical: 10,
@@ -483,26 +563,7 @@ useLayoutEffect(() => {
         fontSize: 14,
         color: colors.darkGray,
       },
-      btnCrEvent:{
-        marginBottom: 30,
-        marginTop: 20,
-        backgroundColor: '#992D22',
-        borderRadius: 20,
-        paddingHorizontal: 10,
-        paddingVertical: 10,
-        marginVertical: 20,
-        alignSelf: 'center',
-        shadowColor: '#992D22',
-        shadowOffset: {
-          width: 0,
-          height: 2,
-        },
-        shadowOpacity: 0.9,
-        shadowRadius: 8,
-        elevation: 5,
-        flexDirection: 'row', // To align the icon and text horizontally
-        alignItems: 'center',
-      },
+      
       createEventButtonText: {
         color: 'white',
         fontWeight: '700',
@@ -529,7 +590,7 @@ useLayoutEffect(() => {
       notificationBadge: {
         position: 'absolute',
         top: 0,
-        right: -4,
+        right: 0,
         backgroundColor: 'red',
         borderRadius: 10,
         paddingHorizontal: 5,
@@ -537,5 +598,60 @@ useLayoutEffect(() => {
       notificationBadgeText: {
         color: 'white',
         fontSize: 12,
+      },
+      votingsContainer: {
+        marginHorizontal: 16,
+      },
+      votingCard: {
+        width: 300,
+        justifyContent: 'center',
+        alignContent: 'center',
+        backgroundColor: 'white',
+        borderRadius: 10,
+        padding: 16,
+        marginBottom: 16,
+        elevation: 2,
+      },
+      votingTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      votingsTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginVertical: 16,
+      },
+      createButton: {
+        backgroundColor: '#992D22',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 24,
+        marginHorizontal: 19,
+        marginBottom: 16,
+        paddingHorizontal: 10,
+        marginVertical: 20,
+        shadowColor: '#992D22',
+        shadowOffset: {
+          width: 0,
+          height: 2,
+        },
+        shadowOpacity: 0.9,
+        shadowRadius: 5,
+        elevation: 5,
+        flexDirection: 'row', // To align the icon and text horizontally
+        alignItems: 'center'
+      },
+      createIcon: {
+        marginRight: 8,
+      },
+      createButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+      },
+      decision: {
+        fontWeight: 'bold',
       },
     });

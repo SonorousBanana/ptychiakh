@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useLayoutEffect } from "react";
-import { View, TouchableOpacity, Text, Image, StyleSheet, FlatList, SafeAreaView, ScrollView } from "react-native";
+import { View, StyleSheet, } from "react-native";
 import MapView from "react-native-maps";
 import { Marker } from "react-native-maps";
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, query, onSnapshot, doc, } from 'firebase/firestore';
 import { auth, database } from '../firebase';
 
 const Map = ({ route }) =>{
@@ -11,10 +11,6 @@ const Map = ({ route }) =>{
     const [eventLocations, setEventLocations] = useState([]);
     const [userLocation, setUserLocation] = useState(null);
 
-
-    //useLayoutEffect(() => {
-      // Fetch event data from Firestore
-      
       const fetchEventLocations = async () => {
         try {
           const eventRef = collection(database, 'Community', location, 'event');
@@ -42,18 +38,13 @@ const Map = ({ route }) =>{
           console.error('Error fetching event data:', error);
         }
       };
-  
-      //fetchEventLocations();
-    //}, [location]);
+
 
     useLayoutEffect(() => {
       fetchEventLocations();
-    },[]);
+    },[eventLocations]);
 
-    const handleMarkerPress = marker => {
-      setSelectedMarker(marker);
-    };
-  
+
     return (
       <View style={styles.container}>
         <MapView
@@ -117,23 +108,6 @@ const Map = ({ route }) =>{
       backgroundColor: "white",
       padding: 10,
       width: "100%",
-    },
-    title: {
-      fontSize: 18,
-      fontWeight: "bold",
-      marginBottom: 10,
-    },
-    eventInfo: {
-      marginBottom: 15,
-      borderWidth: 1,
-      borderColor: "#ddd",
-      padding: 10,
-      borderRadius: 5,
-    },
-    eventTitle: {
-      fontSize: 16,
-      fontWeight: "bold",
-      marginBottom: 5,
     },
   });
   

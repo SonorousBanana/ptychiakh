@@ -20,19 +20,6 @@ const firebaseConfig = {
   measurementId: "G-R9GK9XC4R3"
 };
 
-/*let app;
-if (firebase.apps.length === 0) {
-    app = firebase.initializeApp(firebaseConfig);
-} else {
-    app = firebase.app()
-}
-
-const auth = firebase.ath()
-
-export default { auth };*/
-//Initialize Firebase;
 initializeApp(firebaseConfig);
 export const auth = getAuth();
 export const database = getFirestore();
-////export const field = FieldValue;
-//const analytics = getAnalytics(app);

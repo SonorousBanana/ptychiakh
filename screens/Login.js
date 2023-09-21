@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useLayoutEffect } from "react";
-import { Alert, StyleSheet, Text, View, ActivityIndicator,Button, TextInput, Image, SafeAreaView, TouchableOpacity, StatusBar } from "react-native";
-import { CheckBox } from "@react-native-community/checkbox";
+import { Alert, StyleSheet, Text, View, ActivityIndicator, TextInput, Image, SafeAreaView, TouchableOpacity, StatusBar } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import * as Location from 'expo-location';
 import { auth, database } from "../firebase";
-import { useCollectionData } from "react-native-firebase-hooks";
 import {
   doc,
   collection,
@@ -20,8 +17,6 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import LocationDataComponent from '../locationData';
-//import Geolocation from '@react-native-community/geolocation';
-//import { check, PERMISSIONS, request } from 'react-native-permissions';
 
 const backImage = require("../assets/Vote.jpg");
 
@@ -33,44 +28,39 @@ export default function Login({ route, navigation }) {
   const [terms, setTerms] = useState(false);
   const [community, setCommunity] = useState("");
   const locdata = LocationDataComponent();
-  //const userId = auth.currentUser?.uid;
 
-while(location === 'Wait, we are fetching your location...'){
+  while(location === 'Wait, we are fetching your location...'){
   
  
-  return (
-    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <ActivityIndicator size='large' />
-    </View>
-  );
-}
-
-  
-  //console.log(location);
-  //console.log(name);
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size='large' />
+      </View>
+    );
+  }
 
 const q = collection(database, 'Community');
 
-
   const onHandleLogin = async () => {
-    let uid = false;
+    let uid;
     let ComId = location;
     if (email !== "" && password !== "") {
       signInWithEmailAndPassword(auth, email, password)
         .then((userCredential) => {
+          
           const user = userCredential.user;
           uid = user.uid; // Get the UID
           console.log("Login success. User UID: ", uid);
           console.log("Login success. You are in: ", name);
-        })
-        .catch((err) => Alert.alert("Login error", err.message));
+        
 
-    
+    const ftia3eTaPanta = async () => {
     try {
       let userCommunity = doc(database, "Community", ComId);
       const communityId = userCommunity.id;
-      const querySnapshot = await getDocs(q);
+      const querySnapshot = await getDocs(q);//
       let real;
+      let real1=false;
       querySnapshot.forEach((doc) => {
         if (communityId === doc.id){
             real = true;
@@ -80,8 +70,29 @@ const q = collection(database, 'Community');
 
       //τσεκαρει αν ο χρηστης εχει ξανασυνδεθεί στην συγκεκριμενη τοποθεσια
       //αν δεν εχει ξανασυνδεθει τοτε θετει το real1 ως false και αποθηκευει τον χρηστη υστερα απο ελεγχο
-      const querySnapshot1 = await getDocs(query(checkIfUserBelonges));
-      let real1=false;
+
+      //useEffect(() => {
+        
+        //const q = getDocs(countUsers);
+        /*const unsubscribe = onSnapshot(checkIfUserBelonges, (querySnapshot) => {
+          
+          querySnapshot.forEach((doc) => {
+            if (doc.data().user === email){
+              real1 = true;
+              console.log('this user has logged in in the past in this location');
+          }
+            //console.log('User data: ', doc.data().count);
+            
+          });
+         
+        });
+    
+        // Stop listening for updates when no longer required
+        unsubscribe();*/
+      //}, []);
+
+      const querySnapshot1 = await getDocs(query(checkIfUserBelonges));//
+      
       querySnapshot1.forEach((doc) => {
         if (doc.data().user === email){
             real1 = true;
@@ -94,26 +105,27 @@ const q = collection(database, 'Community');
         console.log("this community exists");
         console.log("Document written with ID: ", userCommunity.id);
 
-        if (real1 === false){  
-          console.log("hello");
-          await setDoc(doc(database, "Community", location, 'users', uid), {
+        if (real1 == false){  
+          
+          setDoc(doc(database, "Community", location, 'users', uid), {
             user: email,
             createdAt: serverTimestamp(),
             isAdmin: false,
             participateInElection: false,
             hasVote: false,
-            Description: null,
+            description: null,
           });
         }else{
           let userId;
           const updateUserLogIn = query(collection(database, "Community", location, 'users'), where('user', '==', email));
-          const querySnapshot2 = await getDocs(updateUserLogIn);
+          const querySnapshot2 = await getDocs(updateUserLogIn);//
             querySnapshot2.forEach((doc) => {
                 //console.log(doc.id);
                 userId = doc.id;
             });
-            const documentRef = doc(database, "Community", location, 'users', userId);
-            await updateDoc(documentRef, {
+            
+            const documentRef = doc(database, "Community", location, 'users', uid);
+            updateDoc(documentRef, {//
                 "createdAt": serverTimestamp(),
             });
         /*await setDoc(doc(database, "Community", location, 'users', userId), { 
@@ -127,7 +139,7 @@ const q = collection(database, 'Community');
         
         console.log("this community doesn't exists, you create a new room");
 
-        await setDoc(doc(database, 'Community', location), {
+         setDoc(doc(database, 'Community', location), {//
             
             postalCode: location,
             name: name,
@@ -137,33 +149,29 @@ const q = collection(database, 'Community');
           });
 
         if (real1 == false){ 
-          //console.log("trexeiiiiiii");
-          await setDoc(doc(database, "Community", location, 'users', uid), {
+          
+          setDoc(doc(database, "Community", location, 'users', uid), {
             user: email,
             createdAt: serverTimestamp(),
             isAdmin: false,
             participateInElection: false,
             hasVote: false,
-            Description: null,
-          });
+            description: null,
+          }, {merge: true});
         }
         console.log("Document written with ID: ", userCommunity.id);
       }
-      
-     
-      
+  
     } catch (e) {
       console.error("Error adding document: ", e);
-    }
-  
+    }}
+    ftia3eTaPanta();
+  })
+  .catch((err) => Alert.alert("Login error", err.message));
   } else {
     Alert.alert("Please Enter Your Details");
   }
 }
-
-
-  
-
 
   return (
     <View style={styles.container}>

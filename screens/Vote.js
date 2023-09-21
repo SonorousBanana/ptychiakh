@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback } from "react";
-import { RefreshControl, Alert, View, TouchableOpacity, Text, Image, StyleSheet, FlatList, Button, Pressable, StatusBar, Dimensions, SafeAreaView, ScrollView } from "react-native";
+import { RefreshControl, Alert, View, TouchableOpacity, Text, StyleSheet, Button, Pressable, StatusBar, SafeAreaView, ScrollView, } from "react-native";
 import { Card } from 'react-native-paper';
 import { useNavigation } from "@react-navigation/native";
 import { useNotifications, addNotification } from './NotificationsContext';
@@ -16,6 +16,9 @@ import {
     onSnapshot,
     querySnapshot,
     where,
+    Timestamp,
+    deleteField,
+    serverTimestamp,
   } from 'firebase/firestore';
   import { FontAwesome5, MaterialCommunityIcons } from '@expo/vector-icons';
   
@@ -38,11 +41,10 @@ const Vote = ({ route }) =>{
     let iconName = 'vote-yea';
     let iconName1 = 'information-variant';
     let size = 20;
-   
+    //const [currentUser, setCurrentUser] = useState(auth.currentUser?.email);
     const { addNotification } = useNotifications();
     const [refreshing, setRefreshing] = useState(false);
     
-
     const onRefresh = useCallback(() => {
       setRefreshing(true);
       setTimeout(() => {
@@ -50,16 +52,44 @@ const Vote = ({ route }) =>{
       }, 1500);
     }, []);
 
-      const  fetchEmails1 = async () => {
-        const userChoice = collection(database, 'Community', location, 'candidates');
-        const querySnapshot = await getDocs(userChoice);
-        const usersFieldArray = querySnapshot.docs.map(doc => ({ key: doc.id, choice: doc.data().choice, description: doc.data().Description})); // replace 'user' with the field you want to extract
-        
-        setVotingUsers(usersFieldArray);
-        
-        
-        };
+    useLayoutEffect(() => {
+      navigation.setOptions({
+        headerRight: () => (
+          
+          <TouchableOpacity
+            style={{
+              marginRight: 10
+            }}
+            onPress={() => navigation.navigate("History")}
+          >
+            
+              <View>
+                <MaterialCommunityIcons name="history" size={35} style={{marginRight: 5}}/>
+                  </View>
+                
+          </TouchableOpacity>
+        )
+      });
+    }, [navigation]);
+
+        useEffect(() => {
+          const candidatesRef = collection(database, 'Community', location, 'candidates');
+
+        // Subscribe to real-time updates using onSnapshot
+        const unsubscribe = onSnapshot(candidatesRef, (querySnapshot) => {
+          const usersFieldArray = querySnapshot.docs.map(doc => ({
+            key: doc.id,
+            choice: doc.data().choice,
+            description: doc.data().description
+          }));
       
+          // Update the state with the new voting user data
+          setVotingUsers(usersFieldArray);
+        });
+          return () => {
+            unsubscribe();
+          };
+        }, []);
 
       const getPartSit = async () => {
         const usersPart = query(collection(database, 'Community', location, 'users'), where('user', '==', auth.currentUser?.email));
@@ -110,12 +140,12 @@ const Vote = ({ route }) =>{
             //let name = doc.get('name');
             // Or use data() to get all fields
             userId = doc.id;
-            text = doc.data().Description;
+            text = doc.data().description;
             
           });
-          if (text !== null) {
+          if (text !== null && participating == true) {
           updateDoc(doc(database, 'Community', location, 'candidates', userId), { 
-            "Description": text,
+            "description": text,
           }).then(() =>{
             console.log("on vote, update desc candidate ok!!");
             console.log(text);
@@ -125,7 +155,6 @@ const Vote = ({ route }) =>{
       
 
       useEffect(() =>{
-        fetchEmails1();
         getPartSit();
         descpRef();
 
@@ -133,6 +162,19 @@ const Vote = ({ route }) =>{
 
             
       const handleParticipationToggle = async () => {
+        
+        Alert.alert(
+          'Confirm Declaration candidacy',
+          'Are you sure you want to for admin`s election?',
+          [
+            {
+              text: 'Not at moment',
+              style: 'destructive',
+            },
+            {
+              text: 'Apply',
+              style: 'cancel',
+              onPress: async () => {
        try {
            
         if (participating === false){
@@ -154,12 +196,11 @@ const Vote = ({ route }) =>{
         await setDoc(doc(database, 'Community', location, 'candidates', userId), {
           choice: auth.currentUser?.email,
           votes: 0,
-          Description: description,
+ 
         });
 
           const newParticipating = !participating;
           setParticipating(newParticipating);
-          fetchEmails1();
           console.log('User participation updated successfully!');
         } else {
           Alert.alert("You already Candidate");
@@ -168,9 +209,28 @@ const Vote = ({ route }) =>{
         } catch (error) {
           console.error('Error updating user participation:', error);
         }
+      },
+    },
+  ],
+  { cancelable: true }
+);
+  
       };
 
       const handleRemoveCandidate = async () => {
+
+        Alert.alert(
+          'Remove your candidacy',
+          'Are you sure you want to emove your candidacy?',
+          [
+            {
+              text: 'Don`t remove',
+              style: 'cancel',
+            },
+            {
+              text: 'Remove',
+              style: 'destructive',
+              onPress: async () => {
         try {
            if (participating === true){        
              
@@ -179,12 +239,12 @@ const Vote = ({ route }) =>{
             const updateUserPart = query(collection(database, "Community", location, 'users'), where('user', '==', auth.currentUser?.email));
             const querySnapshot2 = await getDocs(updateUserPart);
             querySnapshot2.forEach((doc) => {
-              //console.log(doc.id);
               userId = doc.id;
             });
             // Update the user's participation status in Firestore
              updateDoc(doc(database, 'Community', location, 'users', userId), { 
               "participateInElection": false,
+              "isAdmin": false,
             });
     
              deleteDoc(doc(database, 'Community', location, 'candidates', userId), {
@@ -194,7 +254,6 @@ const Vote = ({ route }) =>{
             
             const newParticipating = !participating;
             setParticipating(newParticipating);
-            fetchEmails1();
            console.log('User participation updated successfully!');
           } else {
             Alert.alert("You dont Candidate");
@@ -202,11 +261,29 @@ const Vote = ({ route }) =>{
          } catch (error) {
            console.error('Error updating user participation:', error);
          }
+
+        },
+      },
+    ],
+    { cancelable: true }
+        );
        };
    //PARTICIPATIONS
 
 
    const updateAdminStatus = async () => {
+    function countNestedObjects(data) {
+      let count = 0;
+    
+      for (const key in data) {
+        if (typeof data[key] === 'object') {
+          // If the property is an object, recursively count its nested objects
+          count++;
+        }
+      }
+    
+      return count;
+    }
     try {
       let userId;
       const Admin = query(collection(database, 'Community', location, 'users'), where('user', '==', topUser));
@@ -227,9 +304,12 @@ const Vote = ({ route }) =>{
       querySnapshot.forEach((doc) => {
         const candidateData = doc.data();
         const voteCount = candidateData.votes;
-  
-        if (voteCount > highestVoteCount) {
-          highestVoteCount = voteCount;
+        const allVotes = candidateData.usersVotesHim;
+        const nestedObjectCount = countNestedObjects(allVotes);
+        console.log(`Number of nested objects in usersVotesHim: ${nestedObjectCount}`);
+
+        if (nestedObjectCount > highestVoteCount) {
+          highestVoteCount = nestedObjectCount;
           adminCandidateKey = doc.id;
         }
       });
@@ -247,25 +327,23 @@ const Vote = ({ route }) =>{
         });
       });
 
-      addNotification('Vote submitted successfully');
+      addNotification('Admin has change!!!');
       
       console.log('Admin status updated successfully!');
-   // }
+
     } catch (error) {
       console.error('Error updating admin status:', error);
     }
   };
 
-
-   //Vote
-      
+  
    const votes = async (candidateId) => {
   
       try {
         if (hasVote === false){
         
         setHasVote(true);
-      
+        
         console.log(hasVote);
         
         let userId;
@@ -281,13 +359,20 @@ const Vote = ({ route }) =>{
           "votedCandidateKey": candidateId,
         });
         
-        
-
         const candidateRef = doc(database, 'Community', location, 'candidates', candidateId);
         const candidateDoc = await getDoc(candidateRef);
         const currentVoteCount = candidateDoc.data().votes || 0;
+        const allVotes = candidateDoc.data().usersVotesHim || [];
+
           await updateDoc(candidateRef, {
-           "votes": currentVoteCount + 1, // Increment the candidate's vote count by 1
+           "votes": currentVoteCount + 1,
+           "usersVotesHim": {
+            ...allVotes,
+            [auth.currentUser?.uid]: {
+              time: serverTimestamp(),
+            },
+          },
+            // Increment the candidate's vote count by 1
           });
 
           const candidateData = candidateDoc.data().choice;
@@ -296,10 +381,12 @@ const Vote = ({ route }) =>{
           Alert.alert("You Voted user : " + candidateData);
 
           setVotedCandidateKey(candidateId);
+
         console.log('User Vote updated successfully!');
         addNotification('Vote submitted successfully');
         updateAdminStatus();
         getTopUser();
+
         } else {
           Alert.alert("You have already Voted");
         }
@@ -340,13 +427,23 @@ const Vote = ({ route }) =>{
       const candidateRef1 = doc(database, 'Community', location, 'candidates', votedCandidateKey);
         const candidateDoc1 = await getDoc(candidateRef1);
         const currentVoteCount1 = candidateDoc1.data().votes;
+        const allVotes = candidateDoc1.data().usersVotesHim || [];
+
+        const usersVotesHim = { 
+
+        }
+
         if (currentVoteCount1 > 0){
+          const currUs = auth.currentUser?.email;
           await updateDoc(candidateRef1, {
-           "votes": currentVoteCount1 - 1, // decrement the candidate's vote count by 1
+           "votes": currentVoteCount1 - 1,
+          
+          [`usersVotesHim.${auth.currentUser?.uid}`]: deleteField(),
+        
+            // decrement the candidate's vote count by 1
           });
         }
        
-   // updateAdminStatus();
    updateAdminStatus();
     getTopUser();
       Alert.alert("You took back your Vote");
@@ -361,26 +458,41 @@ const Vote = ({ route }) =>{
    };
    
    const getTopUser = async () => {
+
+    function countNestedObjects(data) {
+      let count = 0;
+    
+      for (const key in data) {
+        if (typeof data[key] === 'object') {
+          // If the property is an object, recursively count its nested objects
+          count++;
+        }
+      }
+    
+      return count;
+    }
+
     try {
       const candidatesQuery = query(collection(database, 'Community', location, 'candidates'));
       const querySnapshot = await getDocs(candidatesQuery);
-  
-      //if (querySnapshot.exist) {
+
       let highestVoteCount = -1;
       let topUser = null;
   
       querySnapshot.forEach((doc) => {
         const candidateData = doc.data();
         const voteCount = candidateData.votes;
-  
-        if (voteCount > highestVoteCount) {
-          highestVoteCount = voteCount;
+        const allVotes = candidateData.usersVotesHim;
+        const nestedObjectCount = countNestedObjects(allVotes);
+        console.log(`Number of nested objects in usersVotesHim: ${nestedObjectCount}`);
+        if (nestedObjectCount > highestVoteCount) {
+          highestVoteCount = nestedObjectCount;
           topUser = candidateData.choice; // This assumes the 'choice' field contains the user's email or name
         }
       });
   
       return topUser;
-      //}
+
     } catch (error) {
       console.error('Error getting top user:', error);
       return null;
@@ -399,53 +511,73 @@ const Vote = ({ route }) =>{
       setTopUser(user);
       console.log("top vote user is : " + topUser);
       
-
     };
 
+    const topUserQuery = query(collection(database, 'Community', location, 'users'), where('user', '==', topUser));
+
+    // Subscribe to real-time updates using onSnapshot
+    const unsubscribe = onSnapshot(topUserQuery, (querySnapshot) => {
+      let userId;
+      
+      // Iterate through the query results (should be just one user)
+      querySnapshot.forEach((doc) => {
+        userId = doc.id;
+        setTopUser(doc.data().user);
+      });
+      
+      console.log("Top vote user is: " + topUser);
+
+      // You can do additional actions with 'userId' if needed
+    });
+
+    // Clean up the subscription when the component unmounts
+    return () => {
+      unsubscribe();
+      updateAdminStatus();
+    };
     
-    fetchTopUser();
-    updateAdminStatus();
-  }, []);
+  }, [topUser]);
 
   const infoCandidatePress = (candidateKey) => {
     if (selectedCandidate === candidateKey) {
       setSelectedCandidate(null);
-      fetchEmails1();
     } else {
       setSelectedCandidate(candidateKey);
-      fetchEmails1();
     }
   };
 
-
-
-
-  const fetchVotingData = async () => {
+  useEffect(() => {
+ 
     try {
       const votingRef = collection(database, 'Community', location, 'voting');
-      const votingSnapshot = await getDocs(votingRef);
-      const votingData = votingSnapshot.docs.map(doc => ({
-        key: doc.id,
-        ...doc.data(),
-      }));
-      setVotingData(votingData);
+      const unsubscribe = onSnapshot(votingRef, (querySnapshot) => {
+        const updatedVotingData = querySnapshot.docs.map((doc) => ({
+          key: doc.id,
+          ...doc.data(),
+        }));
+        setVotingData(updatedVotingData);
+      });
+
+      // Return an unsubscribe function to stop listening when the component unmounts
+      return unsubscribe;
     } catch (error) {
       console.error('Error fetching voting data:', error);
     }
-  };
-
-
-  useEffect(() => {
-   
-
-    fetchVotingData();
-
-    
+  
+    // Start listening for changes when the component mounts
+    // Stop listening when the component unmounts
+    return () => {
+      unsubscribe();
+    };
   }, [location]);
 
+  const currentDate = new Date().toISOString().split('T')[0];
 
-  
-
+  const filteredVotingData = votingData.filter(item => {
+    const votingDate = item.deadlineDate.split('T')[0];
+    console.log('Voting Date:', votingDate);
+    return votingDate >= currentDate;
+  });
 
   const renderVotingItem = ({ item }) => (
 
@@ -456,7 +588,6 @@ const Vote = ({ route }) =>{
     </View>
     </Card>
   );
-
 
   const renderItem = ({ item }) => (
     <Pressable
@@ -484,9 +615,6 @@ const Vote = ({ route }) =>{
 
   );
 
-
-
-
    if (participating === null) {
     // While loading the participation status, show a loading message or spinner
     return (
@@ -501,11 +629,7 @@ const Vote = ({ route }) =>{
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }>
          <SafeAreaView style={{ flex: 1, alignItems: 'center',  justifyContent: 'center', }}>
-         {topUser && (
-          <Text style={styles.text}>
-            User with the most votes: {topUser}
-          </Text>
-        )}
+         
           <Text style={styles.postTitle}>Vote for Admin</Text>
             <Text style={styles.text}>
               Do you want to participate in the election?
@@ -513,15 +637,14 @@ const Vote = ({ route }) =>{
             
          
         {!participating && (
-          <Button title="Take Part in Candidate" onPress={handleParticipationToggle} style={styles.buttonText}/>
+          <Button title="Declaration of candidacy" onPress={handleParticipationToggle} style={styles.buttonText}/>
         )}
 
         
         {participating && (
-          <Button title="Remove Candidate" onPress={handleRemoveCandidate} style={styles.buttonText}/>
+          <Button title="Remove your candidacy" onPress={handleRemoveCandidate} style={styles.buttonText}/>
         )}
-        
-
+      
         <ScrollView nestedScrollEnabled = {true}>
         {votingUsers.map((item, index) => (
             <View key={index}>
@@ -531,7 +654,6 @@ const Vote = ({ route }) =>{
             ))}
          </ScrollView>
 
-
           {hasVote && (
           <Button title={'Take back my vote'} onPress={unVote} style={styles.buttonText}/>
           )}
@@ -539,7 +661,7 @@ const Vote = ({ route }) =>{
     
           <Text style={styles.subtitle}>Vote for Voting Below!</Text>
 
-        {votingData.map((item, index) => (
+        {filteredVotingData.map((item, index) => (
           <View key={index}>
             
             <TouchableOpacity onPress={() => navigation.navigate('VotingItem', { votingIndex: item.key })}>
@@ -548,10 +670,14 @@ const Vote = ({ route }) =>{
             </TouchableOpacity>
           </View> ))}
 
+          <Button
+          title="View Voting History"
+          onPress={() => navigation.navigate('History')}
+           />
+
       </SafeAreaView>
 
       </ScrollView>
-
 
     );
 };
@@ -567,26 +693,15 @@ const styles = StyleSheet.create({
       alignItems: 'center',
       justifyContent: 'center',
     },
-    formContainer: {
-      width: '80%',
-      marginBottom: 20,
-    },
-    postContainer: {
-      width: '80%',
-      marginBottom: 20,
-    },
+    
     postTitle: {
       alignItems: 'center',
       justifyContent: 'center',
       fontSize: 24,
       fontWeight: 'bold',
       marginBottom: 10,
-      
     },
-    postContent: {
-      fontSize: 16,
-      lineHeight: 24,
-    },
+    
     innerContainer: {
       backgroundColor: '#3e3e3e', // Dark gray background color
         paddingVertical: 10,
@@ -623,10 +738,6 @@ const styles = StyleSheet.create({
     },
     text: {
       alignItems: 'center',
-    },
-    candidateName: {
-      fontSize: 18,
-      marginVertical: 10,
     },
     description: {
       color: 'lightblue',

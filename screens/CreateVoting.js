@@ -12,11 +12,9 @@ import {
     doc,
     collection,
     addDoc,
-    updateDoc,
-    getDocs,
   } from 'firebase/firestore';
- 
 
+ 
 const CreatingVoting = ({ route }) => {
     const { location, name, street, city, country, Latitude, Longitude } = route.params;
     const navigation = useNavigation();
@@ -24,7 +22,6 @@ const CreatingVoting = ({ route }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [choices, setChoices] = useState(['', '']);
-  const [customFields, setCustomFields] = useState([]);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -33,6 +30,7 @@ const CreatingVoting = ({ route }) => {
   const [address, setAddress] = useState('');
   const { addNotification } = useNotifications();
   const { triggerRefresh } = useRefreshContext();
+  
 
 
   useEffect(() => { //δοκιμη
@@ -97,7 +95,7 @@ const CreatingVoting = ({ route }) => {
           location: address, 
           date: selectedDate.toISOString().split('T')[0],
           time: selectedTime.toTimeString().split(' ')[0],
-          // Add other fields as needed
+          
         });
         console.log('Event created with ID: ', eventDocRef.id);
         Alert.alert("You plan " + title);
@@ -110,26 +108,12 @@ const CreatingVoting = ({ route }) => {
           title,
           description,
           choices,
-          //resaults: choices,
-          // Add other fields as needed
+          deadlineDate: selectedDate.toISOString().split('T')[0],
+          deadlineTime: selectedTime.toTimeString().split(' ')[0],
+         
         });
         console.log('Voting created with ID: ', votingDocRef.id);
         Alert.alert("You plan " + title);
-
-        const usersRef = collection(database, 'Community', location, 'users');
-        const usersSnapshot = await getDocs(usersRef);
-
-       // const batch = writeBatch(database);
-        
-        usersSnapshot.forEach((userDoc) => {
-          const userRef = doc(usersRef, userDoc.id);
-          updateDoc(userRef, {
-            votedEvents: {
-              [title]: false,
-            },
-          });
-        });
-
       }
       
       // Add any success notification or navigation logic here
@@ -187,9 +171,33 @@ const CreatingVoting = ({ route }) => {
             </View>
           ))}
           <Button title="Add Choice" onPress={addChoice} />
+
+          <Text style={styles.label}>Deadline:</Text>
+
+          <Text style={styles.label}>Date:
+        
+            <DatePicker
+              style={styles.dateTime}
+              value={selectedDate}
+              onChange={handleDateChange}
+              minimumDate={new Date()}
+            />
+       </Text>
+          
+          <Text style={styles.label}>Time:
+          
+            <TimePicker
+             style={styles.dateTime}
+              value={selectedTime}
+              onChange={handleTimeChange}
+              mode="time"
+            />
+          </Text>
+
           <View style={styles.eButton}>
           <Button title="Create Voting" onPress={handleCreate} style={styles.buttonText} color= 'white'/>
           </View>
+
         </React.Fragment>
       )}
 
@@ -231,23 +239,7 @@ const CreatingVoting = ({ route }) => {
               mode="time"
             />
           </Text>
-          {/*customFields.map((field, index) => (
-            <View key={index}>
-              <Text style={styles.label}>{field.label}:</Text>
-              <TextInput
-                style={styles.input}
-                value={field.value}
-                onChangeText={(text) => handleCustomFieldChange(index, field.label, text)}
-                placeholder={`Enter ${field.label}`}
-              />
-              <Button
-                title="Remove"
-                onPress={() => removeCustomField(index)}
-                color="#FF5733"
-            />
-            </View>
-          ))*/}
-          {/*<Button title="Add Custom Field" onPress={addCustomField} />*/}
+
           <View style={styles.eButton}>
             <Button title="Create event" onPress={handleCreate} style={styles.buttonText} color= 'white'/>
           </View>
@@ -290,15 +282,6 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       alignItems: 'center',
       marginBottom: 8,
-    },
-    choiceInput: {
-      flex: 1,
-      borderWidth: 1,
-      borderColor: '#ccc',
-      borderRadius: 8,
-      padding: 10,
-      marginRight: 8,
-      color: '#333',
     },
     
     map: {

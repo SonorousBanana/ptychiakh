@@ -1,6 +1,5 @@
 import * as Location from 'expo-location';
 import React, { useState, createContext, useContext, useEffect } from 'react';
-import { View, ActivityIndicator, TouchableWithoutFeedback, Keyboard, TouchableOpacity } from 'react-native';
 
 export default function LocationComponent() {
 const [locationServiceEnabled, setLocationServiceEnabled] = useState(false);
@@ -67,7 +66,7 @@ let street1;
         setLongitude(longitude)
 
         for (let item of response) {
-          address = `${item.isoCountryCode}:${item.postalCode}`;
+          address = `${item.isoCountryCode}_${item.postalCode}`;
           data = `${item.city}, ${item.country}, ${item.name}, ${item.postalCode}`;
           setLocationData(data);
           setDisplayCurrentAddress(address);

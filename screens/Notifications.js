@@ -30,30 +30,58 @@ const Notifications = () =>{
   };
   
   const styles = StyleSheet.create({
+    
     container: {
       flex: 1,
-      padding: 16,
       backgroundColor: 'white',
+      paddingVertical: 16,
+      paddingHorizontal: 20,
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: 16,
-    },
-    notificationIcon: {
-      marginRight: 5,
+      marginBottom: 20,
     },
     notificationCount: {
-      fontSize: 18,
+      borderRadius: 12,
+      width: 24,
+      height: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginLeft: 10,
+    },
+    notificationCountText: {
+      color: 'white',
+      fontSize: 16,
       fontWeight: 'bold',
     },
     notificationList: {
       flex: 1,
-      marginBottom: 16,
+      marginBottom: 20,
+    },
+    notificationItem: {
+      backgroundColor: 'white',
+      padding: 12,
+      borderRadius: 8,
+      marginBottom: 12,
+      elevation: 3,
+      borderWidth: 1,
+      borderColor: '#ddd',
     },
     notificationText: {
       fontSize: 16,
-      marginBottom: 8,
+      color: '#333',
+    },
+    clearButton: {
+      backgroundColor: '#1877f2',
+      padding: 12,
+      borderRadius: 8,
+      alignItems: 'center',
+    },
+    clearButtonText: {
+      fontSize: 16,
+      color: 'white',
+      fontWeight: 'bold',
     },
   });
 

@@ -1,7 +1,7 @@
 import React, { useState, createContext, useContext, useEffect, useMemo } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
-import { View, ActivityIndicator, TouchableWithoutFeedback, Keyboard, TouchableOpacity, StyleSheet, Text, Image } from 'react-native';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, database } from './firebase';
 import Login from './screens/Login';
@@ -14,6 +14,7 @@ import Profile from './screens/Profile';
 import Notifications from './screens/Notifications';
 import CreateVoting from './screens/CreateVoting';
 import VotingItem from './screens/VotingItem';
+import History from './screens/History';
 import { RefreshProvider } from './screens/RefreshContext';
 import { NotificationsProvider, useNotifications } from './screens/NotificationsContext';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
@@ -51,6 +52,7 @@ const Home1 = ({ location, name, street, city, country, Latitude, Longitude }) =
     <Stack.Screen name='Notifications' component={Notifications} initialParams={{ location, name, street, city, country, Latitude, Longitude }}/>
     <Stack.Screen name='CreateVoting' component={CreateVoting} initialParams={{ location, name, street, city, country, Latitude, Longitude }}/>
     <Stack.Screen name='VotingItem' component={VotingItem} initialParams={{ location, name, street, city, country, Latitude, Longitude }}/>
+    <Stack.Screen name='History' component={History} initialParams={{ location, name, street, city, country, Latitude, Longitude }}/>
   </Stack.Navigator>
   </NotificationsProvider>
   </RefreshProvider>
@@ -125,7 +127,7 @@ function RootNavigator({ location, name, street, city, country, Latitude, Longit
   const { user, setUser } = useContext(AuthenticatedUserContext);
   const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
-    // onAuthStateChanged returns an unsubscriber
+    
     const unsubscribeAuth = onAuthStateChanged(
       auth,
       async authenticatedUser => {
@@ -133,7 +135,7 @@ function RootNavigator({ location, name, street, city, country, Latitude, Longit
         setIsLoading(false);
       }
     );
-// unsubscribe auth listener on unmount
+
     return unsubscribeAuth;
   }, [user]);
   if (isLoading) {
@@ -153,7 +155,7 @@ function RootNavigator({ location, name, street, city, country, Latitude, Longit
 
 export default function App() {
   const [ location, street, name, city, country, Latitude, Longitude ] = LocationComponent();
-  console.log(location);
+  console.log("Your current PostalCode is : ", location);
 
 
 while(location === 'Wait, we are fetching your location...'){
@@ -188,32 +190,32 @@ while(location === 'Wait, we are fetching your location...'){
       // Delete inactive users and their data
       inactiveUsersSnapshot.forEach(async (userDoc) => {
         const userId = userDoc.id;
-        //await auth.deleteUser(userId); // Delete from Firebase Authentication
+        
         await deleteDoc(doc(database, 'Community', location, 'users', userId)); // Delete from Firestore
       });
-      console.log(weekAgo);
+      //console.log(weekAgo);
     }
 
     
       deleteInactiveUsers();
     
-      async function deleteInactiveEvents() {
-        const date = new Date(); // Replace this with your actual date
+      /*async function deleteInactiveEvents() {
+        const date = new Date();
         const dateString = date.toISOString().split('T')[0];
-        // Query for users whose last login time is older than a week
+        
         const q = query(collection(database, 'Community', location, 'event'), where('date', '<', dateString));
         const inactiveEventsSnapshot = await getDocs(q);
   
-        // Delete inactive users and their data
+        
         inactiveEventsSnapshot.forEach(async (eventDoc) => {
           const eventId = eventDoc.id;
-          //await auth.deleteUser(userId); // Delete from Firebase Authentication
+          
           await deleteDoc(doc(database, 'Community', location, 'event', eventId)); // Delete from Firestore
         });
      
       }
     
-      deleteInactiveEvents();
+      deleteInactiveEvents();*/
     
     console.log('Your Area is : ' + name);
     

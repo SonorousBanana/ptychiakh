@@ -4,8 +4,6 @@ import { signOut } from 'firebase/auth';
 import { auth, database } from '../firebase';
 import { useNavigation } from "@react-navigation/native";
 import Ionic from 'react-native-vector-icons/Ionicons';
-import ImagePicker from 'react-native-image-picker';
-
 import {
   doc,
   collection,
@@ -23,45 +21,39 @@ import {
   getCollections,
   serverTimestamp,
 } from 'firebase/firestore';
-import { storage } from '../firebase';
 
 const Profile = ({ route }) =>{
   const { location } = route.params;
   const [profileText, setProfileText] = useState('');
   const [savedText, setSavedText] = useState('');
   const [usersProfile, setUserProfile] = useState('');
-  const [displayText, setDisplayText] = useState('Write something for you...');
-  const [editing, setEditing] = useState(false);
-  const [editedText, setEditedText] = useState('');
-    const navigation = useNavigation();
-    const [profileImage, setProfileImage] = useState(null);
+  const navigation = useNavigation();
+  const [isEditing, setIsEditing] = useState(false);
    
-
     const onSignOut = () => {
         signOut(auth).then(() => console.log("Logout success")).catch(error => console.log('Error logging out: ', error));
       };
 
-
       useEffect(() => {
-        // Fetch the saved text from Firestore when the component mounts
-        const fetchProfileText = async () => {
-          let userId;
-          let text;
-          let user;
-          const docRef = query(collection(database, "Community", location, 'users'), where('user', '==', auth.currentUser?.email)); // Update the collection name and document ID
-          const docSnap = await getDocs(docRef);
+        // Set up a real-time listener for the profile document
+        const docRef = query(collection(database, "Community", location, 'users'), where('user', '==', auth.currentUser?.email)); // Update the collection name and document ID
+
+        const unsubscribe = onSnapshot(docRef, (querySnapshot) => {
+          querySnapshot.forEach((doc) => {
+              const data = doc.data();
+              setProfileText(data.description);
+              setSavedText(data.description);
+          setUserProfile(data.user);
+            });
+          });
+    
+        return () => {
+          // Unsubscribe from the listener when the component unmounts
+          unsubscribe();
           
-         docSnap.forEach((doc) => {
-          userId = doc.id;
-          text = doc.data().Description;
-          user = doc.data().user;
-          
-        });
-        setSavedText(text);
-          setUserProfile(user);
-      }
-        fetchProfileText();
-      }, []);
+        };
+      }, [location]);
+
     
       const handleSave = async () => {
         // Save the input text to Firestore
@@ -74,68 +66,21 @@ const Profile = ({ route }) =>{
         });
         try{
          updateDoc(doc(database, 'Community', location, 'users', userId), { 
-          "Description": profileText }).then(() =>{
+          "description": profileText }).then(() =>{
             console.log("on prof update profile ok!!");
-          }).catch((err) => Alert.alert("Login error", err.message));
+          }).catch((err) => Alert.alert("update description error", err.message));
 
           updateDoc(doc(database, 'Community', location, 'candidates', userId), { 
-            "Description": profileText }).then(() =>{
+            "description": profileText }).then(() =>{
               console.log("on prof, update desc candidate ok!!");
-            }).catch((err) => Alert.alert("Login error", err.message));
+            }).catch((err) => console.log("doesnt paticipate", err.message));
     
         setSavedText(profileText);
+        setIsEditing(false);
         } catch (error) {
           console.error('Error saving profile text:', error);
         }
       };
-
-
-      const openImagePicker = async () => {
-        try {
-          const image = await ImagePicker.openPicker({
-            width: 300,
-            height: 300,
-            cropping: true,
-          });
-    
-          const uploadUri = image.path;
-    
-          // Upload image to Firebase Storage
-          const storageRef = storage().ref(`profileImages/${userId}`);
-          const task = storageRef.putFile(uploadUri);
-    
-          task.on('state_changed', (taskSnapshot) => {
-            const progress = (taskSnapshot.bytesTransferred / taskSnapshot.totalBytes) * 100;
-            console.log(`Upload is ${progress}% complete`);
-          });
-    
-          task.then(async () => {
-            console.log('Image uploaded to Firebase Storage');
-    
-            // Get the download URL of the uploaded image
-            const downloadURL = await storageRef.getDownloadURL();
-    
-            // Update the user's Firestore document with the download URL
-            const userDocRef = doc(
-              database,
-              'Community',
-              location,
-              'users',
-              userId
-            );
-    
-            await updateDoc(userDocRef, {
-              profileImage: downloadURL,
-            });
-    
-            console.log('Download URL stored in Firestore');
-            setProfileImage(downloadURL);
-          });
-        } catch (error) {
-          console.error('Error uploading image:', error);
-        }
-      };
-
 
       const handleDeleteAccount = async () => {
         // Show a confirmation alert to the user
@@ -163,15 +108,13 @@ const Profile = ({ route }) =>{
                     .delete()
                     .then(() => {
                     
-
                       deleteDoc(doc(database, 'Community', location, 'users', userId)).then(() =>{
-                        console.log("on prof update profile ok!!");
-                      }).catch((err) => Alert.alert("Login error", err.message));
+                        console.log("on prof delete profile ok!!");
+                      }).catch((err) => Alert.alert("delete profile error"));
 
                       deleteDoc(doc(database, 'Community', location, 'candidates', userId)).then(() =>{
-                          console.log("on prof, update desc candidate ok!!");
-                        }).catch((err) => Alert.alert("Login error", err.message));
-
+                          console.log("on prof, delete candidate ok!!");
+                        }).catch((err) => Alert.alert("delete candidate", err.message));
 
                       console.log('User account deleted successfully.');
                       // Redirect or perform any other actions after deletion
@@ -179,8 +122,7 @@ const Profile = ({ route }) =>{
                     .catch((error) => {
                       console.error('Error deleting user account:', error);
                     });
-
-                      
+    
                 } else {
                   console.log('No user is currently signed in.');
                 }
@@ -190,65 +132,41 @@ const Profile = ({ route }) =>{
           { cancelable: true }
         );
       };
-    
-      const handleEditStart = () => {
-        setEditing(true);
-        setEditedText(displayText);
-      };
-    
-      const handleEditEnd = async () => {
-        setEditing(false);
-        setDisplayText(editedText);
-        let userId;
-        const docRef = query(collection(database, "Community", location, 'users'), where('user', '==', auth.currentUser?.email)); // Update the collection name and document ID
-        const docSnap = await getDocs(docRef);
-          
-         docSnap.forEach((doc) => {
-          userId = doc.id;
-        });
-        try{
-        await updateDoc(doc(database, 'Community', location, 'users', userId), { 
-          "Description": editedText });
-    
-        setSavedText(editedText);
-        } catch (error) {
-          console.error('Error saving profile text:', error);
-        }
-      };
-    
-      const handleTextChange = (text) => {
-        setEditedText(text);
-      };
 
-    return(
+    return (
       <ScrollView>
-      <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
-        <View style={styles.container}>
-        
-        {profileImage && <Image source={{ uri: profileImage }} style={{ width: 100, height: 100 }} />}
-          <Text style={styles.text}>Describe yourself about participating in elections. Why should your fellow citizens vote for you as a community leader?</Text>
+        <TouchableWithoutFeedback onPress={() => Keyboard.dismiss()}>
+          <View style={styles.container}>
             
-            <TextInput
-              placeholder="Write something..."
-              value={profileText}
-              multiline
-              numberOfLines={4}
-              onChangeText={setProfileText}
-              style={styles.text}
-          />
-            <Button title="Save" onPress={handleSave} />
-            
-            <Text style={styles.title}>Description: </Text>
-            <Text style={styles.text}>{savedText}</Text>
-            
-        <TouchableOpacity style={styles.button} onPress={onSignOut}>
-          <Text style={{color: 'white', fontWeight: '600', fontSize: 18}}>Log out <Ionic name='log-out-outline'size={18}/></Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleDeleteAccount}>
-          <Text style={{ color: 'red', fontWeight: '600', fontSize: 18, margin: 30, alignSelf: 'center' }}>Delete Your Account</Text>
-        </TouchableOpacity>
-      </View>
-      </TouchableWithoutFeedback>
+            <Text style={styles.text}>Describe yourself about participating in elections. Why should your fellow citizens vote for you as a community leader?</Text>
+            <Text style={styles.title}>Description:</Text>
+  
+            {isEditing ? (
+              <TextInput
+                value={profileText}
+                onChangeText={setProfileText}
+                multiline
+                numberOfLines={4}
+                style={styles.descriptionText}
+              />
+            ) : (
+              <Text style={styles.descriptionText} onPress={() => setIsEditing(true)}>
+                {profileText}
+              </Text>
+            )}
+
+            {isEditing && (
+              <Button title="Save" onPress={handleSave} />
+             )}
+  
+            <TouchableOpacity style={styles.button} onPress={onSignOut}>
+              <Text style={{ color: 'white', fontWeight: '600', fontSize: 18 }}>Log out <Ionic name='log-out-outline' size={18} /></Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleDeleteAccount}>
+              <Text style={{ color: 'red', fontWeight: '600', fontSize: 18, margin: 30, alignSelf: 'center' }}>Delete Your Account</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableWithoutFeedback>
       </ScrollView>
     );
 };
@@ -273,9 +191,9 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       margin: 15,
-      borderWidth: 1,
-      borderColor: '#ccc',
-      borderRadius: 8,
+      //borderWidth: 1,
+      //borderColor: '#ccc',
+      //borderRadius: 8,
       padding: 12,
       marginBottom: 16,
       color: '#333',
@@ -285,5 +203,16 @@ const styles = StyleSheet.create({
       justifyContent: 'center',
       alignItems: 'center',
       margin: 10,
+    },
+   descriptionText: {
+      justifyContent: 'center',
+      alignItems: 'center',
+      margin: 15,
+      borderWidth: 1,
+      borderColor: '#ccc',
+      borderRadius: 8,
+      padding: 12,
+      marginBottom: 16,
+      color: '#333',
     },
   });

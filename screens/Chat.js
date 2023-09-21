@@ -9,26 +9,42 @@ import React, {
   import {
     collection,
     addDoc,
+    getDocs,
     orderBy,
     query,
-    onSnapshot
+    onSnapshot,
+    where,
   } from 'firebase/firestore';
   import { auth, database } from '../firebase';
   import { useNavigation } from '@react-navigation/native';
-  import DatePicker from '@react-native-community/datetimepicker';
-  import TimePicker from '@react-native-community/datetimepicker';
-
-
+ 
 
   export default function Chat({ route }) {
     const { location } = route.params;
     const [userId, setUserId ] = useState(auth.currentUser?.uid);
     console.log(location);
-
+    const [isAdmin, setIsAdmin] = useState(null);
     const [messages, setMessages] = useState([]);
     const navigation = useNavigation();
 
-  
+    useLayoutEffect(() => {
+      
+      let userId;
+        const updateUserVote = query(collection(database, "Community", location, 'users'), where('isAdmin', '==', true));
+
+        // Set up a listener with onSnapshot
+        const unsubscribe = onSnapshot(updateUserVote, (querySnapshot) => {
+          querySnapshot.forEach((doc) => {
+            userId = doc.data().user;
+          });
+          setIsAdmin(userId);
+          console.log("Admin is", userId);
+        });
+
+        // Return the unsubscribe function to clean up the listener when needed
+        return unsubscribe;
+
+    }, []);
 
     useLayoutEffect(() => {
 
@@ -79,10 +95,27 @@ import React, {
                 }}
                 user={{
                   _id: auth?.currentUser?.email,
-                  avatar: 'https://i.pravatar.cc/300'
+                  //avatar: 'https://i.pravatar.cc/300'
                 }}
                 renderMessage={({ currentMessage }) => (
+
                   <View style={{ marginVertical: 10 }}>
+
+                  {currentMessage.user._id === isAdmin && (
+                          <Text
+                            style={{
+                              marginLeft: currentMessage.user._id === auth?.currentUser?.email ? 0 : 20,
+                              marginRight: currentMessage.user._id === auth?.currentUser?.email ? 20 : 0,
+                              fontSize: 12,
+                              color: 'purple', // Set the color for "IS ADMIN" text
+                              textAlign: currentMessage.user._id === auth?.currentUser?.email ? 'right' : 'left',
+                             fontWeight: 'bold',
+                            }}
+                          >
+                            ADMIN
+                          </Text>
+                        )}
+
                     <Text style={{ 
                       marginLeft: currentMessage.user._id === auth?.currentUser?.email ? 0 : 20,
                       marginRight: currentMessage.user._id === auth?.currentUser?.email ? 20 : 0,
@@ -112,9 +145,6 @@ import React, {
                       marginLeft: currentMessage.user._id === auth?.currentUser?.email ? 'auto' : 20,
                       marginRight: currentMessage.user._id === auth?.currentUser?.email ? 20 : 'auto',
 
-                      
-                      
-                      
                       }}>
                         <Text style={{
                           fontSize: 15,
@@ -135,10 +165,9 @@ import React, {
                       </View>
                       
                   </View>
+   
                 )}
               />
-       
-       
-        
+
       );
 }
